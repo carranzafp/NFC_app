@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">NFC_app</string>
+
+    <string name="hello_world">Hello world!</string>
+    <string name="action_settings">Settings</string>
+    <string name="explanation">NFC Enabled</string>
+</resources>
