@@ -18,11 +18,13 @@ import android.view.MenuItem;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.util.Arrays;
 
 public class MainActivity extends AppCompatActivity {
 
+    public byte LSI_NFCF_CMD_READ=(byte)0x06;
     public static final String MIME_TEXT_PLAIN = "text/plain";
     public static final String TAG = "NfcDemo";
 
@@ -152,18 +154,101 @@ public class MainActivity extends AppCompatActivity {
 
 
             String[] techList = tag.getTechList();
-            //String searchedTech = Ndef.class.getName();
+            String searchedTech = NfcF.class.getName();
 
             for (String tech : techList) {
                 Log.d(TAG,"TECH: " + tech);
-                //if (searchedTech.equals(tech)) {
-                //    new NdefReaderTask().execute(tag);
-                //    break;
-                //}
+                if (searchedTech.equals(tech)) {
+                    new NFcFReadTask().execute(tag);
+
+                    break;
+                }
             }
         }
     }
 
+
+    /**
+     * Background task for reading the data. Do not block the UI thread while reading.
+     *
+     * @author Ralf Wondratschek
+     *
+     */
+    private class NFcFReadTask extends AsyncTask<Tag, Void, String> {
+
+        @Override
+        protected String doInBackground(Tag... params) {
+            Tag tag = params[0];
+            //final byte[] payload =hexStringToByteArray("010900018001");//Block 1
+            //final byte[] payload =hexStringToByteArray("01090001000104");//Block 1 tunnel memory plain text
+
+            //NfcF mytag= NfcF.get(tag);
+            Wrp_NFCF_MN63Y1208 mytag=new Wrp_NFCF_MN63Y1208(tag);
+
+
+            if (mytag == null) {
+                // NDEF is not supported by this Tag.
+                Log.d(TAG,"NFcF is not supported by this tag");
+                return null;
+            }
+
+            //READ TEST
+            mytag.AddBlock(1, Wrp_NFCF_MN63Y1208.MODE_TUNNEL_PLAIN);
+            mytag.AddBlock(2, Wrp_NFCF_MN63Y1208.MODE_TUNNEL_PLAIN);
+            Log.d(TAG, "RAW CMD:" + bytesToHex(mytag.ReadCmd(), ' '));
+
+            //WRITE TEST
+            //final byte[] data=hexStringToByteArray("554400000000000055440000000000aa");
+            //mytag.AddBlock(1, Wrp_NFCF_MN63Y1208.MODE_TUNNEL_PLAIN, data);
+            //Log.d(TAG, "RAW CMD:" + bytesToHex(mytag.WriteCmd(), ' '));
+            try {
+
+                //Todo: create parser for response in the NFCF_MN63Y class
+                //Read Test
+                mytag.executeRead();
+                if(mytag.isResultOK()) {
+                    return bytesToHex(mytag.getBlockData(2),' ');
+                }
+                return "FAILURE";
+
+                //Write test
+//                mytag.executeWrite();
+//                if(mytag.isResultOK()) {
+//                    return "RESULT OK";
+//                }
+//                return "FAILURE";
+
+
+            }
+            catch (IOException e) {
+                Log.e(TAG,"IO Exception",e);
+            }
+
+//            NdefMessage ndefMessage = ndef.getCachedNdefMessage();
+//            NdefRecord[] records = ndefMessage.getRecords();
+//            for (NdefRecord ndefRecord : records) {
+//                if (ndefRecord.getTnf() == NdefRecord.TNF_WELL_KNOWN && Arrays.equals(ndefRecord.getType(), NdefRecord.RTD_TEXT)) {
+//                    try {
+//                        return readText(ndefRecord);
+//                    } catch (UnsupportedEncodingException e) {
+//                        Log.e(TAG, "Unsupported Encoding", e);
+//                    }
+//                }
+//            }
+
+            return null;
+        }
+
+
+
+
+        @Override
+        protected void onPostExecute(String result) {
+            if (result != null) {
+                mTextView.setText("Read content: " + result);
+            }
+        }
+    }
 
     /**
      * Background task for reading the data. Do not block the UI thread while reading.
@@ -244,6 +329,16 @@ public class MainActivity extends AppCompatActivity {
             hexChars[j * 3 + 2] = separator;
         }
         return new String(hexChars);
+    }
+
+    public static byte[] hexStringToByteArray(String s) {
+        int len = s.length();
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
+                    + Character.digit(s.charAt(i+1), 16));
+        }
+        return data;
     }
 
     @Override
